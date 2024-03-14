@@ -17,30 +17,20 @@ import java.io.ByteArrayInputStream;
 import java.io.File;
 import javax.swing.*;
 
-
-
-
 public class MainWindow extends JFrame {
 
     private JLabel imageLabel;
-
     private JLabel statusLabel;
-
-
-
     private JButton playButton;
-
     private JButton recentButton;
+    private long pausedPosition = 0;
     private JButton stopButton;
     private JButton pauseButton;
     private JButton prevButton;
     private JButton nextButton;
     private JButton openFileButton;
     private JPanel imageContainer;
-   // Private JButton recent;
-
-
-
+    private String selectedFilePath;
     private Player player;
     private Thread playerThread;
 
@@ -65,7 +55,6 @@ public class MainWindow extends JFrame {
         imageContainer.setLayout(new BorderLayout());
 
         ImageIcon imageIcon = new ImageIcon("path_to_your_image.jpg"); // Replace "path_to_your_image.jpg" with the actual path to your image file
-
 
         JLabel backgroundImageLabel = new JLabel(imageIcon);
 
@@ -108,14 +97,6 @@ public class MainWindow extends JFrame {
             }
         });
 
-
-       // recentButton.addActionListener(new ActionListener() {
-       //     public void actionPerformed(ActionEvent e) {
-       //         showrecent();
-        //    }
-    //    });
-
-
         pauseButton.addActionListener(new ActionListener() {
             public void actionPerformed(ActionEvent e) {
                 pause();
@@ -142,6 +123,7 @@ public class MainWindow extends JFrame {
         int result = fileChooser.showOpenDialog(this);
         if (result == JFileChooser.APPROVE_OPTION) {
             File selectedFile = fileChooser.getSelectedFile();
+            selectedFilePath = selectedFile.getAbsolutePath(); // Store the selected file path
             statusLabel.setText("Playing: " + selectedFile.getName());
             updateAlbumImage(selectedFile);
             playSelectedFile(selectedFile);
@@ -150,59 +132,77 @@ public class MainWindow extends JFrame {
 
     private void playSelectedFile(File file) {
         try {
-            FileInputStream fis = new FileInputStream(file);
-            BufferedInputStream bis = new BufferedInputStream(fis);
-            player = new Player(bis);
+            final FileInputStream fis = new FileInputStream(file);
+            final BufferedInputStream bis = new BufferedInputStream(fis);
+            player = new javazoom.jl.player.Player(bis);
 
             // Start a new thread to play the audio in the background
             playerThread = new Thread(() -> {
                 try {
+                    // Skip the initial part to resume playback from the paused position
+                    fis.skip(pausedPosition);
                     player.play();
-                } catch (JavaLayerException e) {
+                } catch (IOException | JavaLayerException e) {
                     System.out.println("Error playing audio: " + e);
+                    statusLabel.setText("Error playing audio: " + e.getMessage());
+                } finally {
+                    if (player != null) {
+                        try {
+                            player.close(); // Close the player after playback
+                        } catch (RuntimeException e) {
+                            System.out.println("Error closing player: " + e);
+                        }
+                    }
                 }
             });
             playerThread.start();
-        } catch (FileNotFoundException | JavaLayerException e) {
-            System.out.println("Error playing audio: " + e);
-            statusLabel.setText("Error playing audio: " + e.getMessage());
+        } catch (FileNotFoundException e) {
+            System.out.println("File not found: " + file.getAbsolutePath());
+            statusLabel.setText("File not found: " + file.getAbsolutePath());
+        } catch (JavaLayerException | IOException e) {
+            System.out.println("Error initializing player: " + e);
+            statusLabel.setText("Error initializing player: " + e.getMessage());
         }
     }
+
     private void stop() {
         if (player != null && playerThread != null) {
             player.close();
             playerThread.interrupt();
             statusLabel.setText("Stopped");
+            pausedPosition = 0; // Reset the paused position
         }
     }
 
     private void pause() {
         if (player != null && playerThread != null && playerThread.isAlive()) {
-            player.close();
-            playerThread.interrupt();
-            statusLabel.setText("Paused");
+            try {
+                pausedPosition = player.getPosition(); // Store the position where playback was paused
+                player.close();
+                playerThread.interrupt();
+                statusLabel.setText("Paused");
+            } catch (RuntimeException e) {
+                System.out.println("Error getting player position: " + e);
+            }
         }
     }
 
     private void play() {
-        if (player != null && playerThread != null && playerThread.isAlive()) {
-            // Player is already playing, do nothing
+        if (selectedFilePath == null || selectedFilePath.isEmpty()) {
+            // No file selected
+            System.out.println("No file selected");
             return;
         }
 
-        String statusLabelText = statusLabel.getText();
-        int colonIndex = statusLabelText.indexOf(':');
-        if (colonIndex == -1 || colonIndex + 2 >= statusLabelText.length()) {
-            // Invalid status label text format, cannot extract file name
-            System.out.println("Invalid status label text format: " + statusLabelText);
-            return;
-        }
-
-        String selectedFilePath = statusLabelText.substring(colonIndex + 2).trim(); // Extract the selected file path from the status label
         File file = new File(selectedFilePath);
         if (!file.exists()) {
             System.out.println("File not found: " + selectedFilePath);
             statusLabel.setText("File not found: " + selectedFilePath);
+            return;
+        }
+
+        if (player != null && playerThread != null && playerThread.isAlive()) {
+            // Player is already playing, do nothing
             return;
         }
 
