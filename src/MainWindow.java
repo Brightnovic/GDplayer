@@ -8,14 +8,7 @@ import javazoom.jl.player.Player;
 
 import org.jaudiotagger.audio.AudioFile;
 import org.jaudiotagger.audio.AudioFileIO;
-import org.jaudiotagger.tag.FieldKey;
 import org.jaudiotagger.tag.Tag;
-
-import javax.imageio.ImageIO;
-import java.awt.image.BufferedImage;
-import java.io.ByteArrayInputStream;
-import java.io.File;
-import javax.swing.*;
 
 public class MainWindow extends JFrame {
 
@@ -23,7 +16,10 @@ public class MainWindow extends JFrame {
     private JLabel statusLabel;
     private JButton playButton;
     private JButton recentButton;
+    private FileInputStream fis;
     private long pausedPosition = 0;
+
+
     private JButton stopButton;
     private JButton pauseButton;
     private JButton prevButton;
@@ -52,16 +48,7 @@ public class MainWindow extends JFrame {
         imageContainer = new JPanel();
         imageContainer.setBackground(Color.BLACK);
         imageContainer.setLayout(new BorderLayout());
-        imageContainer.setLayout(new BorderLayout());
 
-        ImageIcon imageIcon = new ImageIcon("path_to_your_image.jpg"); // Replace "path_to_your_image.jpg" with the actual path to your image file
-
-        JLabel backgroundImageLabel = new JLabel(imageIcon);
-
-        imageContainer.setPreferredSize(new Dimension(imageIcon.getIconWidth(), imageIcon.getIconHeight()));
-
-        // Add the background image label to the image container
-        imageContainer.add(backgroundImageLabel, BorderLayout.CENTER);
         JPanel controlPanel = new JPanel();
         controlPanel.setLayout(new FlowLayout());
         controlPanel.add(playButton);
@@ -72,6 +59,7 @@ public class MainWindow extends JFrame {
         controlPanel.add(recentButton);
         controlPanel.add(openFileButton);
         controlPanel.add(statusLabel);
+
         getContentPane().setLayout(new BorderLayout());
         getContentPane().add(imageContainer, BorderLayout.CENTER);
         getContentPane().add(controlPanel, BorderLayout.SOUTH);
@@ -132,9 +120,11 @@ public class MainWindow extends JFrame {
 
     private void playSelectedFile(File file) {
         try {
-            final FileInputStream fis = new FileInputStream(file);
-            final BufferedInputStream bis = new BufferedInputStream(fis);
-            player = new javazoom.jl.player.Player(bis);
+            fis = new FileInputStream(file); // Initialize the instance variable fis
+            BufferedInputStream bis = new BufferedInputStream(fis);
+
+            // Create a new Player instance for the current file
+            player = new Player(bis);
 
             // Start a new thread to play the audio in the background
             playerThread = new Thread(() -> {
@@ -142,14 +132,18 @@ public class MainWindow extends JFrame {
                     // Skip the initial part to resume playback from the paused position
                     fis.skip(pausedPosition);
                     player.play();
-                } catch (IOException | JavaLayerException e) {
+                } catch (JavaLayerException e) {
                     System.out.println("Error playing audio: " + e);
                     statusLabel.setText("Error playing audio: " + e.getMessage());
+                } catch (IOException e) {
+                    System.out.println("Error reading file: " + e);
+                    statusLabel.setText("Error reading file: " + e.getMessage());
                 } finally {
                     if (player != null) {
                         try {
+                            pausedPosition = fis.available(); // Update pausedPosition with the current position
                             player.close(); // Close the player after playback
-                        } catch (RuntimeException e) {
+                        } catch (IOException e) {
                             System.out.println("Error closing player: " + e);
                         }
                     }
@@ -159,11 +153,14 @@ public class MainWindow extends JFrame {
         } catch (FileNotFoundException e) {
             System.out.println("File not found: " + file.getAbsolutePath());
             statusLabel.setText("File not found: " + file.getAbsolutePath());
-        } catch (JavaLayerException | IOException e) {
+        } catch (IOException e) {
             System.out.println("Error initializing player: " + e);
             statusLabel.setText("Error initializing player: " + e.getMessage());
+        } catch (JavaLayerException e) {
+            throw new RuntimeException(e);
         }
     }
+
 
     private void stop() {
         if (player != null && playerThread != null) {
@@ -177,11 +174,11 @@ public class MainWindow extends JFrame {
     private void pause() {
         if (player != null && playerThread != null && playerThread.isAlive()) {
             try {
-                pausedPosition = player.getPosition(); // Store the position where playback was paused
+                pausedPosition = fis.available(); // Store the position where playback was paused
                 player.close();
                 playerThread.interrupt();
                 statusLabel.setText("Paused");
-            } catch (RuntimeException e) {
+            } catch (IOException e) {
                 System.out.println("Error getting player position: " + e);
             }
         }
