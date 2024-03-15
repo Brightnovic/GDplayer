@@ -9,11 +9,13 @@ import javazoom.jl.player.Player;
 import org.jaudiotagger.audio.AudioFile;
 import org.jaudiotagger.audio.AudioFileIO;
 import org.jaudiotagger.tag.Tag;
+import javax.swing.Timer;
 
 public class MainWindow extends JFrame {
 
     private JLabel imageLabel;
     private JLabel statusLabel;
+    private Timer timer;
     private JButton playButton;
     private JButton recentButton;
     private FileInputStream fis;
@@ -31,10 +33,24 @@ public class MainWindow extends JFrame {
     private Thread playerThread;
 
     public MainWindow() {
+
         super("Music Player");
 
         setSize(1100, 600);
         setLocationRelativeTo(null);
+
+        timer = new Timer(100, new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                if (player != null && playerThread != null) {
+                    try {
+                        pausedPosition = fis.getChannel().position();
+                    } catch (IOException ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
+            }
+        });
 
         playButton = new JButton("Play");
         stopButton = new JButton("Stop");
@@ -126,41 +142,40 @@ public class MainWindow extends JFrame {
             // Create a new Player instance for the current file
             player = new Player(bis);
 
-            // Start a new thread to play the audio in the background
+            // Start the Timer to update playback position
+            timer.start();
+
             playerThread = new Thread(() -> {
                 try {
                     // Skip the initial part to resume playback from the paused position
                     fis.skip(pausedPosition);
                     player.play();
                 } catch (JavaLayerException e) {
-                    System.out.println("Error playing audio: " + e);
-                    statusLabel.setText("Error playing audio: " + e.getMessage());
+                    // Error handling...
                 } catch (IOException e) {
-                    System.out.println("Error reading file: " + e);
-                    statusLabel.setText("Error reading file: " + e.getMessage());
+                    // Error handling...
                 } finally {
                     if (player != null) {
                         try {
                             pausedPosition = fis.available(); // Update pausedPosition with the current position
                             player.close(); // Close the player after playback
                         } catch (IOException e) {
-                            System.out.println("Error closing player: " + e);
+                            // Error handling...
                         }
                     }
+                    // Stop the Timer after playback ends
+                    timer.stop();
                 }
             });
             playerThread.start();
         } catch (FileNotFoundException e) {
-            System.out.println("File not found: " + file.getAbsolutePath());
-            statusLabel.setText("File not found: " + file.getAbsolutePath());
+            // File not found handling...
         } catch (IOException e) {
-            System.out.println("Error initializing player: " + e);
-            statusLabel.setText("Error initializing player: " + e.getMessage());
+            // Error initializing player handling...
         } catch (JavaLayerException e) {
-            throw new RuntimeException(e);
+            // Exception handling...
         }
     }
-
 
     private void stop() {
         if (player != null && playerThread != null) {
@@ -173,20 +188,15 @@ public class MainWindow extends JFrame {
 
     private void pause() {
         if (player != null && playerThread != null && playerThread.isAlive()) {
-            try {
-                pausedPosition = fis.available(); // Store the position where playback was paused
-                player.close();
-                playerThread.interrupt();
-                statusLabel.setText("Paused");
-            } catch (IOException e) {
-                System.out.println("Error getting player position: " + e);
-            }
+            player.close();
+            playerThread.interrupt();
+            timer.stop(); // Stop the Timer immediately on pause
+            statusLabel.setText("Paused");
         }
     }
 
     private void play() {
         if (selectedFilePath == null || selectedFilePath.isEmpty()) {
-            // No file selected
             System.out.println("No file selected");
             return;
         }
@@ -199,12 +209,12 @@ public class MainWindow extends JFrame {
         }
 
         if (player != null && playerThread != null && playerThread.isAlive()) {
-            // Player is already playing, do nothing
-            return;
+            return; // Player is already playing, do nothing
         }
 
-        // Start playing the selected file
+        // Start playing from the saved position
         playSelectedFile(file);
+        // Resume playback from the exact saved position
     }
 
     private void updateAlbumImage(File audioFile) {
