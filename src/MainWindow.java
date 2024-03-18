@@ -141,6 +141,9 @@ public class MainWindow extends JFrame {
 
     private void playSelectedFile(File file) {
         try {
+            if (fis != null) {
+                fis.close(); // Close the previous FileInputStream if open
+            }
             fis = new FileInputStream(file); // Initialize the instance variable fis
             BufferedInputStream bis = new BufferedInputStream(fis);
 
@@ -181,7 +184,6 @@ public class MainWindow extends JFrame {
             // Exception handling...
         }
     }
-
     private void stop() {
         if (player != null && playerThread != null) {
             player.close();
