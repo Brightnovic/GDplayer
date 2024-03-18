@@ -2,17 +2,20 @@ import java.awt.*;
 import java.awt.event.*;
 import javax.swing.*;
 import java.io.*;
-
 import javazoom.jl.decoder.JavaLayerException;
 import javazoom.jl.player.Player;
-
 import org.jaudiotagger.audio.AudioFile;
 import org.jaudiotagger.audio.AudioFileIO;
 import org.jaudiotagger.tag.Tag;
 import javax.swing.Timer;
 
 public class MainWindow extends JFrame {
-
+    private String[] musicFilePaths = {
+            "path/to/file1.mp3",
+            "path/to/file2.mp3",
+            "path/to/file3.mp3"
+            // Add more file paths as needed
+    };
     private JLabel imageLabel;
     private JLabel statusLabel;
     private Timer timer;
@@ -31,6 +34,8 @@ public class MainWindow extends JFrame {
     private String selectedFilePath;
     private Player player;
     private Thread playerThread;
+
+    private int currentFileIndex = 0;
 
     public MainWindow() {
 
@@ -233,12 +238,19 @@ public class MainWindow extends JFrame {
     }
 
     private void prev() {
-        // Add logic to play the previous media file
-        statusLabel.setText("Previous");
+        currentFileIndex = (currentFileIndex - 1 + musicFilePaths.length) % musicFilePaths.length;
+        selectedFilePath = musicFilePaths[currentFileIndex];
+        playSelectedFile(new File(selectedFilePath));
     }
 
     private void next() {
-        // Add logic to play the next media file
-        statusLabel.setText("Next");
+        currentFileIndex = (currentFileIndex + 1) % musicFilePaths.length;
+        selectedFilePath = musicFilePaths[currentFileIndex];
+        playSelectedFile(new File(selectedFilePath));
     }
+
+    public static void main(String[] args) {
+        SwingUtilities.invokeLater(() -> new MainWindow());
+    }
+
 }

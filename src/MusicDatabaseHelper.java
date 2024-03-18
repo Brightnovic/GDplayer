@@ -3,19 +3,22 @@ import java.sql.*;
 public class MusicDatabaseHelper {
 
     private static final String DB_URL = "jdbc:mysql://localhost:3306/nextmusic";
-    private static final String DB_USER = "root";
+    private static final String DB_USER = "";
     private static final String DB_PASSWORD = "";
 
     // Database connection object
     private Connection connection;
 
     public MusicDatabaseHelper() {
+
         try {
             connection = DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD);
         } catch (SQLException e) {
             e.printStackTrace();
             System.out.println("Failed to connect to the database");
         }
+
+
     }
 
     // Method to insert a played music path into the database
