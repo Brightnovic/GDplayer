@@ -35,6 +35,8 @@ public class MainWindow extends JFrame {
     private Player player;
     private Thread playerThread;
 
+
+
     private int currentFileIndex = 0;
 
     public MainWindow() {
@@ -43,6 +45,8 @@ public class MainWindow extends JFrame {
 
         setSize(1100, 600);
         setLocationRelativeTo(null);
+
+
 
         timer = new Timer(100, new ActionListener() {
             @Override
@@ -65,7 +69,23 @@ public class MainWindow extends JFrame {
         openFileButton = new JButton("Open File");
         statusLabel = new JLabel("No file selected");
         recentButton = new JButton("Recently Played ");
+        playButton.setBackground(new Color(77, 175, 124)); // Green color
+        stopButton.setBackground(Color.RED);
+        pauseButton.setBackground(new Color(250, 180, 45)); // Yellow color
+        prevButton.setBackground(new Color(63, 81, 181)); // Blue color
+        nextButton.setBackground(new Color(233, 30, 99)); // Pink color
+        openFileButton.setBackground(new Color(96, 125, 139)); // Steel blue color
+        recentButton.setBackground(new Color(255, 152, 0)); // Orange
 
+
+        statusLabel.setForeground(Color.BLACK); // Set text color of status label to white
+        playButton.setForeground(Color.WHITE); // Set text color of play button to white
+        stopButton.setForeground(Color.WHITE); // Set text color of stop button to white
+        pauseButton.setForeground(Color.WHITE); // Set text color of pause button to white
+        prevButton.setForeground(Color.WHITE); // Set text color of prev button to white
+        nextButton.setForeground(Color.WHITE); // Set text color of next button to white
+        openFileButton.setForeground(Color.WHITE); // Set text color of open file button to white
+        recentButton.setForeground(Color.WHITE); // Set text color of recent button to white
         imageContainer = new JPanel();
         imageContainer.setBackground(Color.BLACK);
         imageContainer.setLayout(new BorderLayout());
@@ -138,7 +158,6 @@ public class MainWindow extends JFrame {
             playSelectedFile(selectedFile);
         }
     }
-
     private void playSelectedFile(File file) {
         try {
             if (fis != null) {
@@ -176,6 +195,10 @@ public class MainWindow extends JFrame {
                 }
             });
             playerThread.start();
+
+            // Add the selected file path to the musicFilePaths array
+            addFilePath(file.getAbsolutePath());
+
         } catch (FileNotFoundException e) {
             // File not found handling...
         } catch (IOException e) {
@@ -184,6 +207,7 @@ public class MainWindow extends JFrame {
             // Exception handling...
         }
     }
+
     private void stop() {
         if (player != null && playerThread != null) {
             player.close();
@@ -201,6 +225,23 @@ public class MainWindow extends JFrame {
             statusLabel.setText("Paused");
         }
     }
+
+
+
+    private void addFilePath(String filePath) {
+        // Check if the filePath is already in the array
+        for (String path : musicFilePaths) {
+            if (path.equals(filePath)) {
+                return; // File path already exists, no need to add again
+            }
+        }
+        // Expand the array by one to accommodate the new file path
+        String[] newFilePaths = new String[musicFilePaths.length + 1];
+        System.arraycopy(musicFilePaths, 0, newFilePaths, 0, musicFilePaths.length);
+        newFilePaths[newFilePaths.length - 1] = filePath; // Add the new file path to the end
+        musicFilePaths = newFilePaths; // Update the musicFilePaths array with the new paths
+    }
+
 
     private void play() {
         if (selectedFilePath == null || selectedFilePath.isEmpty()) {
@@ -223,7 +264,6 @@ public class MainWindow extends JFrame {
         playSelectedFile(file);
         // Resume playback from the exact saved position
     }
-
     private void updateAlbumImage(File audioFile) {
         try {
             AudioFile file = AudioFileIO.read(audioFile);
@@ -238,19 +278,21 @@ public class MainWindow extends JFrame {
             System.out.println("Error loading album image: " + e);
         }
     }
-
     private void prev() {
         currentFileIndex = (currentFileIndex - 1 + musicFilePaths.length) % musicFilePaths.length;
         selectedFilePath = musicFilePaths[currentFileIndex];
+        stop(); // Stop playback before playing the new file
+        updateAlbumImage(new File(selectedFilePath)); // Update the album image
         playSelectedFile(new File(selectedFilePath));
     }
 
     private void next() {
         currentFileIndex = (currentFileIndex + 1) % musicFilePaths.length;
         selectedFilePath = musicFilePaths[currentFileIndex];
+        stop(); // Stop playback before playing the new file
+        updateAlbumImage(new File(selectedFilePath)); // Update the album image
         playSelectedFile(new File(selectedFilePath));
     }
-
     public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> new MainWindow());
     }
