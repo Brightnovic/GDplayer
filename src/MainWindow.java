@@ -41,7 +41,7 @@ public class MainWindow extends JFrame {
 
     public MainWindow() {
 
-        super("Music Player");
+        super("GDMusic Player");
 
         setSize(1100, 600);
         setLocationRelativeTo(null);
@@ -221,7 +221,8 @@ public class MainWindow extends JFrame {
         if (player != null && playerThread != null && playerThread.isAlive()) {
             player.close();
             playerThread.interrupt();
-            timer.stop(); // Stop the Timer immediately on pause
+            timer.stop();
+            // Stop the Timer immediately on pause
             statusLabel.setText("Paused");
         }
     }
@@ -263,6 +264,8 @@ public class MainWindow extends JFrame {
         // Start playing from the saved position
         playSelectedFile(file);
         // Resume playback from the exact saved position
+        statusLabel.setText("playing"+ file.getName());
+
     }
     private void updateAlbumImage(File audioFile) {
         try {

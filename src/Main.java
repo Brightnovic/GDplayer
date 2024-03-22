@@ -4,6 +4,7 @@ import java.io.InputStream;
 
 public class Main {
     public static void main(String[] args) {
+
         SplashDemo splash = new SplashDemo();
         splash.showSplash();
     }
@@ -17,16 +18,17 @@ class SplashDemo extends Window {
     public void showSplash() {
         setSize(1200, 700);
         setLocationRelativeTo(null);
-
         Panel panel = new Panel();
         panel.setLayout(new FlowLayout(FlowLayout.CENTER, 0, 0)); // Use FlowLayout for text labels
 
         try {
+
             // Load image using InputStream from class resource
             InputStream imageStream = getClass().getResourceAsStream("/GDMUSICIMAGE.PNG");//
             ImageIcon originalIcon = new ImageIcon(imageStream.readAllBytes());
 
             // Resize the image while preserving its aspect ratio
+            // image is zoomed by default
             Image scaledImage = originalIcon.getImage().getScaledInstance(1200, -1, Image.SCALE_SMOOTH);
             ImageIcon scaledIcon = new ImageIcon(scaledImage);
 
