@@ -7,6 +7,7 @@ import javazoom.jl.player.Player;
 import org.jaudiotagger.audio.AudioFile;
 import org.jaudiotagger.audio.AudioFileIO;
 import org.jaudiotagger.tag.Tag;
+import javax.swing.JProgressBar;
 
 public class MainWindow extends JFrame {
     private String[] musicFilePaths = {
@@ -15,7 +16,12 @@ public class MainWindow extends JFrame {
     };
     private JLabel imageLabel;
     private JLabel statusLabel;
+
+    private JProgressBar progressBar;
+
     private Timer timer;
+
+    private JPanel controlPanel;
     private JButton playButton;
     private JButton recentButton;
     private FileInputStream fis;
@@ -43,16 +49,25 @@ public class MainWindow extends JFrame {
         setSize(1100, 600);
         setLocationRelativeTo(null);
 
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        progressBar = new JProgressBar(0, 100);
+       // Add the progress bar to the control panel
+
+
 
 
         timer = new Timer(100, new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                if (player != null && playerThread != null) {
+                if (player != null && fis != null) {
                     try {
-                        pausedPosition = fis.getChannel().position();
+                        // Example values, you'll need to replace these with actual calculations
+                        long totalLength = fis.getChannel().size();
+                        long currentPosition = fis.getChannel().position();
+                        int progress = (int)(((double)currentPosition / (double)totalLength) * 100);
+                        progressBar.setValue(progress);
                     } catch (IOException ex) {
-                        throw new RuntimeException(ex);
+                        ex.printStackTrace();
                     }
                 }
             }
@@ -97,7 +112,9 @@ public class MainWindow extends JFrame {
         controlPanel.add(recentButton);
         controlPanel.add(openFileButton);
         controlPanel.add(statusLabel);
-
+        progressBar.setValue(0);
+        progressBar.setStringPainted(true); // Show progress text
+        controlPanel.add(progressBar);
         getContentPane().setLayout(new BorderLayout());
         getContentPane().add(imageContainer, BorderLayout.CENTER);
         getContentPane().add(controlPanel, BorderLayout.SOUTH);
@@ -237,10 +254,15 @@ public class MainWindow extends JFrame {
 
     private void pause() {
         if (player != null && playerThread != null && playerThread.isAlive()) {
+            // Assuming you can calculate pausedPosition accurately
+            try {
+                pausedPosition = fis.getChannel().position(); // Save current position
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
             player.close();
             playerThread.interrupt();
-            timer.stop();
-            // Stop the Timer immediately on pause
+            timer.stop(); // Stop the Timer immediately on pause
             statusLabel.setText("Paused");
         }
     }
