@@ -11,10 +11,8 @@ import javax.swing.Timer;
 
 public class MainWindow extends JFrame {
     private String[] musicFilePaths = {
-            "path/to/file1.mp3",
-            "path/to/file2.mp3",
-            "path/to/file3.mp3"
-            // Add more file paths as needed
+
+            // empty for now!
     };
     private JLabel imageLabel;
     private JLabel statusLabel;
@@ -114,6 +112,21 @@ public class MainWindow extends JFrame {
             }
         });
 
+        recentButton.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                Recent recentWindow = new Recent(musicFilePaths, new ActionListener() {
+                    @Override
+                    public void actionPerformed(ActionEvent e) {
+                        selectedFilePath = e.getActionCommand();
+                        playSelectedFile(new File(selectedFilePath));
+                    }
+                });
+                recentWindow.setVisible(true);
+            }
+        });
+
+
+
         playButton.addActionListener(new ActionListener() {
             public void actionPerformed(ActionEvent e) {
                 play();
@@ -158,6 +171,8 @@ public class MainWindow extends JFrame {
             playSelectedFile(selectedFile);
         }
     }
+
+
     private void playSelectedFile(File file) {
         try {
             if (fis != null) {
