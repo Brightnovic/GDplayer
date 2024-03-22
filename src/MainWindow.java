@@ -7,7 +7,6 @@ import javazoom.jl.player.Player;
 import org.jaudiotagger.audio.AudioFile;
 import org.jaudiotagger.audio.AudioFileIO;
 import org.jaudiotagger.tag.Tag;
-import javax.swing.Timer;
 
 public class MainWindow extends JFrame {
     private String[] musicFilePaths = {
@@ -117,14 +116,13 @@ public class MainWindow extends JFrame {
                 Recent recentWindow = new Recent(musicFilePaths, new ActionListener() {
                     @Override
                     public void actionPerformed(ActionEvent e) {
-                        selectedFilePath = e.getActionCommand();
+                        selectedFilePath = (String) e.getActionCommand();
                         playSelectedFile(new File(selectedFilePath));
                     }
                 });
                 recentWindow.setVisible(true);
             }
         });
-
 
 
         playButton.addActionListener(new ActionListener() {
@@ -167,8 +165,12 @@ public class MainWindow extends JFrame {
             File selectedFile = fileChooser.getSelectedFile();
             selectedFilePath = selectedFile.getAbsolutePath(); // Store the selected file path
             statusLabel.setText("Playing: " + selectedFile.getName());
+            pausedPosition = 0;
             updateAlbumImage(selectedFile);
             playSelectedFile(selectedFile);
+
+            // Add selected file path to the musicFilePaths array
+            addFilePath(selectedFilePath);
         }
     }
 
@@ -221,6 +223,7 @@ public class MainWindow extends JFrame {
         } catch (JavaLayerException e) {
             // Exception handling...
         }
+        addFilePath(file.getAbsolutePath());
     }
 
     private void stop() {
