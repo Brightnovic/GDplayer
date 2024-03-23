@@ -1,16 +1,22 @@
 import java.awt.*;
 import java.awt.event.*;
+import javax.sound.midi.Receiver;
+import javax.sound.midi.Sequence;
+import javax.sound.midi.Sequencer;
+import javax.sound.midi.Synthesizer;
 import javax.swing.*;
-import javax.sound.sampled.*;
+import javax.sound.sampled.*; //###
 import java.io.*;
 import javazoom.jl.decoder.JavaLayerException;
 import javazoom.jl.player.Player;
 import org.jaudiotagger.audio.AudioFile;
 import org.jaudiotagger.audio.AudioFileIO;
 import org.jaudiotagger.tag.Tag;
+import org.w3c.dom.ls.LSOutput;
+
 import javax.swing.JProgressBar;
 import javax.swing.event.ChangeEvent;
-import javax.swing.event.ChangeListener;
+import javax.swing.event.ChangeListener; //###
 
 public class MainWindow extends JFrame {
     private String[] musicFilePaths = {
@@ -20,18 +26,26 @@ public class MainWindow extends JFrame {
     private JLabel imageLabel;
     private JLabel statusLabel;
 
+
+    private Sequencer seqr;//###
+    private Sequence seq;//###
+    private Receiver receiver;//###
+    private boolean usingHardwareSoundbank;//###
+    private Synthesizer synth;//###
+
+
     private JProgressBar progressBar;
 
-    private Timer timer;
+    private Timer timer;//###
     int progress = 0;
 
     private JPanel controlPanel;
 
-    private JSlider volumeSlider;
+    private JSlider volumeSlider; //###
     private JButton playButton;
     private JButton recentButton;
 
-    private float volumeLevel = 0.0f;
+    private float volumeLevel = 0.0f;//###
 
     private JButton muteButton;
 
@@ -71,6 +85,52 @@ public class MainWindow extends JFrame {
        // Add the progress bar to the control panel
 
 
+
+        //###
+        class VolumeControl {
+            private static Mixer mixer;
+
+            private static FloatControl volumeControl;
+
+            static {
+                findSpeakers();
+                System.out.println("finding speaking working");
+            }
+
+            private static void findSpeakers() {
+                Mixer.Info[] mixers = AudioSystem.getMixerInfo();
+                for (Mixer.Info mixerInfo : mixers) {
+                    if (!mixerInfo.getName().equals("Java Sound Audio Engine")) continue;
+                    mixer = AudioSystem.getMixer(mixerInfo);
+                    System.out.println(mixer + "method inside class working");
+                    Line.Info[] lines = mixer.getSourceLineInfo();
+                    for (Line.Info info : lines) {
+                        try {
+                            System.out.println("in TRY Catch");
+                            Line line = mixer.getLine(info);
+                            line.open();
+                            if (line.isControlSupported(FloatControl.Type.MASTER_GAIN)) {
+                                volumeControl = (FloatControl) line.getControl(FloatControl.Type.MASTER_GAIN);
+                                break;
+                            }
+                        } catch (LineUnavailableException e) {
+                            System.out.println("in  catch problem  with findspeaker method"+e);
+                            e.printStackTrace();
+                        }
+                    }
+                }
+            }
+
+            public static void setVolume(float level) {
+                if (volumeControl != null) {
+                    volumeControl.setValue(limit(volumeControl, level));
+                }
+            }
+
+            private static float limit(FloatControl control, float level) {
+                return Math.min(control.getMaximum(), Math.max(control.getMinimum(), level));
+            }
+        }
 
 
         timer = new Timer(100, new ActionListener() {
@@ -126,14 +186,15 @@ public class MainWindow extends JFrame {
         imageContainer = new JPanel();
         imageContainer.setBackground(Color.BLACK);
         imageContainer.setLayout(new BorderLayout());
-
-        JSlider volumeSlider = new JSlider(JSlider.HORIZONTAL, 0, 100, 50);
+//###
+        // Volume slider initialization
+        volumeSlider = new JSlider(JSlider.HORIZONTAL, 0, 100, 50);
         volumeSlider.setMajorTickSpacing(10);
-        volumeSlider.setMinorTickSpacing(1);
+        volumeSlider.setMinorTickSpacing(5);
         volumeSlider.setPaintTicks(true);
         volumeSlider.setPaintLabels(true);
         volumeSlider.setPreferredSize(new Dimension(200, 50));
-
+//###
 
         JPanel controlPanel = new JPanel();
         controlPanel.setLayout(new FlowLayout());
@@ -147,7 +208,7 @@ public class MainWindow extends JFrame {
         controlPanel.add(statusLabel);
         controlPanel.add(progressBar);
         controlPanel.add(muteButton);
-        controlPanel.add(volumeSlider);
+        controlPanel.add(volumeSlider);//###
 
         progressBar.setValue(0);
         progressBar.setStringPainted(true);
@@ -185,14 +246,21 @@ public class MainWindow extends JFrame {
                 play();
             }
         });
+        // Add volume slider change listener
+
+        //###
         volumeSlider.addChangeListener(new ChangeListener() {
             public void stateChanged(ChangeEvent e) {
                 int value = volumeSlider.getValue();
+                System.out.println("event listening working");
                 float level = value / 100.0f; // Convert to float between 0.0 and 1.0
-                VolumeControl.setVolume(level); // Call setVolume method of VolumeControl
+                VolumeControl.setVolume(level);
+
+                System.out.println(level);
+
             }
         });
-
+//###
 
         stopButton.addActionListener(new ActionListener() {
             public void actionPerformed(ActionEvent e) {
@@ -343,53 +411,6 @@ public class MainWindow extends JFrame {
         }
     }
 
-
-
-
-
-    public final class VolumeControl {
-
-        private static Mixer mixer;
-        private static FloatControl volumeControl;
-
-        static {
-            findSpeakers();
-        }
-
-        private static void findSpeakers() {
-            Mixer.Info[] mixers = AudioSystem.getMixerInfo();
-
-            for (Mixer.Info mixerInfo : mixers) {
-                if (!mixerInfo.getName().equals("Java Sound Audio Engine")) continue;
-
-                mixer = AudioSystem.getMixer(mixerInfo);
-                Line.Info[] lines = mixer.getSourceLineInfo();
-
-                for (Line.Info info : lines) {
-                    try {
-                        Line line = mixer.getLine(info);
-                        line.open();
-                        if (line.isControlSupported(FloatControl.Type.MASTER_GAIN)) {
-                            volumeControl = (FloatControl) line.getControl(FloatControl.Type.MASTER_GAIN);
-                            break;
-                        }
-                    } catch (LineUnavailableException e) {
-                        e.printStackTrace();
-                    }
-                }
-            }
-        }
-
-        public static void setVolume(float level) {
-            if (volumeControl != null) {
-                volumeControl.setValue(limit(volumeControl, level));
-            }
-        }
-
-        private static float limit(FloatControl control, float level) {
-            return Math.min(control.getMaximum(), Math.max(control.getMinimum(), level));
-        }
-    }
 
 
 
