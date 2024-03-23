@@ -1,6 +1,7 @@
 import java.awt.*;
 import java.awt.event.*;
 import javax.swing.*;
+import javax.sound.sampled.*;
 import java.io.*;
 import javazoom.jl.decoder.JavaLayerException;
 import javazoom.jl.player.Player;
@@ -8,6 +9,8 @@ import org.jaudiotagger.audio.AudioFile;
 import org.jaudiotagger.audio.AudioFileIO;
 import org.jaudiotagger.tag.Tag;
 import javax.swing.JProgressBar;
+import javax.swing.event.ChangeEvent;
+import javax.swing.event.ChangeListener;
 
 public class MainWindow extends JFrame {
     private String[] musicFilePaths = {
@@ -20,10 +23,22 @@ public class MainWindow extends JFrame {
     private JProgressBar progressBar;
 
     private Timer timer;
+    int progress = 0;
 
     private JPanel controlPanel;
+
+    private JSlider volumeSlider;
     private JButton playButton;
     private JButton recentButton;
+
+    private float volumeLevel = 0.0f;
+
+    private JButton muteButton;
+
+    
+    private boolean isMuted = false; // Tracks whether the audio is muted
+
+
     private FileInputStream fis;
     private long pausedPosition = 0;
 
@@ -46,7 +61,9 @@ public class MainWindow extends JFrame {
 
         super("GDMusic Player");
 
-        setSize(1100, 600);
+        setSize(1300, 600);
+
+
         setLocationRelativeTo(null);
 
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
@@ -64,12 +81,20 @@ public class MainWindow extends JFrame {
                         // Example values, you'll need to replace these with actual calculations
                         long totalLength = fis.getChannel().size();
                         long currentPosition = fis.getChannel().position();
-                        int progress = (int)(((double)currentPosition / (double)totalLength) * 100);
+                          progress = 0;
+                        progress = (int)(((double)currentPosition / (double)totalLength) * 100);
+
                         progressBar.setValue(progress);
                     } catch (IOException ex) {
                         ex.printStackTrace();
                     }
                 }
+            }
+        });
+        muteButton = new JButton("Mute");
+        muteButton.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                toggleMute();
             }
         });
 
@@ -102,6 +127,14 @@ public class MainWindow extends JFrame {
         imageContainer.setBackground(Color.BLACK);
         imageContainer.setLayout(new BorderLayout());
 
+        JSlider volumeSlider = new JSlider(JSlider.HORIZONTAL, 0, 100, 50);
+        volumeSlider.setMajorTickSpacing(10);
+        volumeSlider.setMinorTickSpacing(1);
+        volumeSlider.setPaintTicks(true);
+        volumeSlider.setPaintLabels(true);
+        volumeSlider.setPreferredSize(new Dimension(200, 50));
+
+
         JPanel controlPanel = new JPanel();
         controlPanel.setLayout(new FlowLayout());
         controlPanel.add(playButton);
@@ -112,9 +145,14 @@ public class MainWindow extends JFrame {
         controlPanel.add(recentButton);
         controlPanel.add(openFileButton);
         controlPanel.add(statusLabel);
-        progressBar.setValue(0);
-        progressBar.setStringPainted(true); // Show progress text
         controlPanel.add(progressBar);
+        controlPanel.add(muteButton);
+        controlPanel.add(volumeSlider);
+
+        progressBar.setValue(0);
+        progressBar.setStringPainted(true);
+
+
         getContentPane().setLayout(new BorderLayout());
         getContentPane().add(imageContainer, BorderLayout.CENTER);
         getContentPane().add(controlPanel, BorderLayout.SOUTH);
@@ -147,6 +185,14 @@ public class MainWindow extends JFrame {
                 play();
             }
         });
+        volumeSlider.addChangeListener(new ChangeListener() {
+            public void stateChanged(ChangeEvent e) {
+                int value = volumeSlider.getValue();
+                float level = value / 100.0f; // Convert to float between 0.0 and 1.0
+                VolumeControl.setVolume(level); // Call setVolume method of VolumeControl
+            }
+        });
+
 
         stopButton.addActionListener(new ActionListener() {
             public void actionPerformed(ActionEvent e) {
@@ -157,6 +203,14 @@ public class MainWindow extends JFrame {
         pauseButton.addActionListener(new ActionListener() {
             public void actionPerformed(ActionEvent e) {
                 pause();
+            }
+        });
+
+        volumeSlider.addChangeListener(new ChangeListener() {
+            public void stateChanged(ChangeEvent e) {
+                int value = volumeSlider.getValue();
+                float level = value / 100.0f; // Convert to float between 0.0 and 1.0
+                VolumeControl.setVolume(level);
             }
         });
 
@@ -172,6 +226,8 @@ public class MainWindow extends JFrame {
             }
         });
     }
+
+
 
 
     private void openFile() {
@@ -202,6 +258,8 @@ public class MainWindow extends JFrame {
 
             // Create a new Player instance for the current file
             player = new Player(bis);
+            progress = 0;
+
 
             // Start the Timer to update playback position
             timer.start();
@@ -243,12 +301,30 @@ public class MainWindow extends JFrame {
         addFilePath(file.getAbsolutePath());
     }
 
+
+    private void toggleMute() {
+        isMuted = !isMuted; // Toggle mute state
+        if (isMuted) {
+            muteButton.setText("Unmute");
+            muteAudio(true); // Mute the audio
+        } else {
+            muteButton.setText("Mute");
+            muteAudio(false); // Unmute the audio
+        }
+    }
+
+
+
+
+
+
     private void stop() {
         if (player != null && playerThread != null) {
             player.close();
             playerThread.interrupt();
             statusLabel.setText("Stopped");
             pausedPosition = 0; // Reset the paused position
+            progress = 0;
         }
     }
 
@@ -264,6 +340,77 @@ public class MainWindow extends JFrame {
             playerThread.interrupt();
             timer.stop(); // Stop the Timer immediately on pause
             statusLabel.setText("Paused");
+        }
+    }
+
+
+
+
+
+    public final class VolumeControl {
+
+        private static Mixer mixer;
+        private static FloatControl volumeControl;
+
+        static {
+            findSpeakers();
+        }
+
+        private static void findSpeakers() {
+            Mixer.Info[] mixers = AudioSystem.getMixerInfo();
+
+            for (Mixer.Info mixerInfo : mixers) {
+                if (!mixerInfo.getName().equals("Java Sound Audio Engine")) continue;
+
+                mixer = AudioSystem.getMixer(mixerInfo);
+                Line.Info[] lines = mixer.getSourceLineInfo();
+
+                for (Line.Info info : lines) {
+                    try {
+                        Line line = mixer.getLine(info);
+                        line.open();
+                        if (line.isControlSupported(FloatControl.Type.MASTER_GAIN)) {
+                            volumeControl = (FloatControl) line.getControl(FloatControl.Type.MASTER_GAIN);
+                            break;
+                        }
+                    } catch (LineUnavailableException e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
+        }
+
+        public static void setVolume(float level) {
+            if (volumeControl != null) {
+                volumeControl.setValue(limit(volumeControl, level));
+            }
+        }
+
+        private static float limit(FloatControl control, float level) {
+            return Math.min(control.getMaximum(), Math.max(control.getMinimum(), level));
+        }
+    }
+
+
+
+    private void muteAudio(boolean mute) {
+        try {
+            Mixer.Info[] infos = AudioSystem.getMixerInfo();
+            for (Mixer.Info info : infos) {
+                Mixer mixer = AudioSystem.getMixer(info);
+                Line.Info[] lineInfos = mixer.getTargetLineInfo();
+                for (Line.Info lineInfo : lineInfos) {
+                    Line line = mixer.getLine(lineInfo);
+                    line.open();
+                    if (line.isControlSupported(BooleanControl.Type.MUTE)) {
+                        BooleanControl bc = (BooleanControl) line.getControl(BooleanControl.Type.MUTE);
+                        bc.setValue(mute);
+                    }
+                    line.close();
+                }
+            }
+        } catch (LineUnavailableException e) {
+            e.printStackTrace();
         }
     }
 
@@ -327,6 +474,7 @@ public class MainWindow extends JFrame {
         stop(); // Stop playback before playing the new file
         updateAlbumImage(new File(selectedFilePath)); // Update the album image
         playSelectedFile(new File(selectedFilePath));
+        progress = 0;
     }
 
     private void next() {
@@ -335,6 +483,7 @@ public class MainWindow extends JFrame {
         stop(); // Stop playback before playing the new file
         updateAlbumImage(new File(selectedFilePath)); // Update the album image
         playSelectedFile(new File(selectedFilePath));
+        progress = 0;
     }
     public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> new MainWindow());
